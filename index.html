@@ -73,7 +73,16 @@
       <button class="btn-primary" id="btn-goto-personal">Ir a Personal</button>
     </div>
 
-    <div id="grid-wrapper" class="grid-wrapper">
+    <div class="view-toggle">
+      <button class="view-btn active" data-view="slots">Por horario</button>
+      <button class="view-btn" data-view="people">Por persona</button>
+    </div>
+
+    <div id="slot-wrapper" class="grid-wrapper">
+      <table id="slot-table" class="schedule-table slot-table"></table>
+    </div>
+
+    <div id="grid-wrapper" class="grid-wrapper" hidden>
       <table id="schedule-table" class="schedule-table"></table>
     </div>
 
@@ -116,6 +125,18 @@
 
     <div class="modal-buttons">
       <button id="btn-close-modal" class="btn-secondary">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: ELEGIR PERSONAS PARA UN HORARIO ===== -->
+<div id="modal-slot" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <h3 id="slot-title">Horario</h3>
+    <p class="hint">Tocá los nombres que trabajan en este horario.</p>
+    <div id="slot-people" class="slot-people"></div>
+    <div class="modal-buttons">
+      <button id="btn-close-slot" class="btn-primary">Listo</button>
     </div>
   </div>
 </div>

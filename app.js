@@ -298,14 +298,119 @@
   const emptyStateEl = document.getElementById("empty-state");
   const gridWrapperEl = document.getElementById("grid-wrapper");
 
+  const SLOTS = [
+    { rest: true, label: "Descanso" },
+    { start: "08:00", end: "16:00", label: "8 a 16" },
+    { start: "12:00", end: "16:00", label: "12 a 16" },
+    { start: "11:00", end: "15:00", label: "11 a 15" },
+    { start: "15:00", end: "19:00", label: "15 a 19" },
+    { start: "16:00", end: "00:00", label: "16 a 00" },
+    { start: "19:00", end: "00:00", label: "19 a 00" },
+    { start: "20:00", end: "00:00", label: "20 a 00" }
+  ];
+  const slotWrapperEl = document.getElementById("slot-wrapper");
+  const slotTableEl = document.getElementById("slot-table");
+  const viewToggleEl = document.querySelector(".view-toggle");
+  let currentView = "slots";
+  try { currentView = localStorage.getItem("horarios_view") || "slots"; } catch (e) {}
+
+  document.querySelectorAll(".view-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      currentView = btn.dataset.view;
+      try { localStorage.setItem("horarios_view", currentView); } catch (e) {}
+      renderTable();
+    });
+  });
+
+  function inSlot(shift, slot) {
+    return slot.rest ? shift.type === "rest" : (shift.type !== "rest" && shift.start === slot.start && shift.end === slot.end);
+  }
+  function peopleInSlot(slot, day) {
+    return employees.filter(emp => (weekState.shifts[shiftKey(emp.id, day)] || []).some(s => inSlot(s, slot)));
+  }
+
+  function renderSlotTable() {
+    const dates = getDayDates();
+    let html = "<thead><tr><th>Horario</th>";
+    DAYS.forEach((day, i) => {
+      html += `<th><div class="day-name">${day}</div><div class="day-date">${formatDayDate(dates[i])}</div></th>`;
+    });
+    html += "</tr></thead><tbody>";
+    SLOTS.forEach((slot, si) => {
+      html += `<tr><td class="slot-label${slot.rest ? " rest-label" : ""}">${slot.label}</td>`;
+      for (let d = 0; d < 7; d++) {
+        const people = peopleInSlot(slot, d);
+        html += `<td class="slot-cell" data-slot="${si}" data-day="${d}">`;
+        html += people.length
+          ? people.map(p => `<div class="name-chip" style="background:${slot.rest ? "#B16E4B;color:white" : p.color}">${escapeHtml(p.name)}</div>`).join("")
+          : `<div class="cell-plus">+</div>`;
+        html += "</td>";
+      }
+      html += "</tr>";
+    });
+    slotTableEl.innerHTML = html + "</tbody>";
+    slotTableEl.querySelectorAll(".slot-cell").forEach(cell => {
+      cell.addEventListener("click", () => openSlotModal(+cell.dataset.slot, +cell.dataset.day));
+    });
+  }
+
+  // ---------- Modal elegir personas ----------
+  const modalSlot = document.getElementById("modal-slot");
+  const slotPeopleEl = document.getElementById("slot-people");
+  let activeSlot = null;
+
+  function openSlotModal(slotIndex, day) {
+    activeSlot = { slot: SLOTS[slotIndex], day };
+    document.getElementById("slot-title").textContent = `${DAYS[day]} — ${SLOTS[slotIndex].label}`;
+    renderSlotPeople();
+    modalSlot.hidden = false;
+  }
+
+  function renderSlotPeople() {
+    const { slot, day } = activeSlot;
+    slotPeopleEl.innerHTML = "";
+    employees.forEach(emp => {
+      const key = shiftKey(emp.id, day);
+      const on = (weekState.shifts[key] || []).some(s => inSlot(s, slot));
+      const btn = document.createElement("button");
+      btn.className = on ? "on" : "";
+      btn.innerHTML = `<span class="color-dot" style="background:${emp.color}"></span>${escapeHtml(emp.name)}<span class="check">${on ? "✓" : ""}</span>`;
+      btn.addEventListener("click", () => {
+        let list = weekState.shifts[key] || [];
+        if (on) {
+          list = list.filter(s => !inSlot(s, slot));
+        } else if (slot.rest) {
+          list = [{ type: "rest" }];
+        } else {
+          list = list.filter(s => s.type !== "rest");
+          list.push({ type: "work", start: slot.start, end: slot.end, roleId: null });
+        }
+        weekState.shifts[key] = list;
+        saveWeek();
+        renderSlotPeople();
+        renderTable();
+      });
+      slotPeopleEl.appendChild(btn);
+    });
+  }
+
+  document.getElementById("btn-close-slot").addEventListener("click", () => { modalSlot.hidden = true; });
+  modalSlot.addEventListener("click", e => { if (e.target === modalSlot) modalSlot.hidden = true; });
+
   function renderTable() {
+    document.querySelectorAll(".view-btn").forEach(b => b.classList.toggle("active", b.dataset.view === currentView));
     if (employees.length === 0) {
       emptyStateEl.hidden = false;
       gridWrapperEl.hidden = true;
+      slotWrapperEl.hidden = true;
+      viewToggleEl.hidden = true;
       return;
     }
     emptyStateEl.hidden = true;
-    gridWrapperEl.hidden = false;
+    viewToggleEl.hidden = false;
+    slotWrapperEl.hidden = currentView !== "slots";
+    gridWrapperEl.hidden = currentView === "slots";
+    if (currentView === "slots") { renderSlotTable(); return; }
 
     const dates = getDayDates();
 
@@ -464,6 +569,7 @@
 
   function exportImage() {
     if (employees.length === 0) { alert("Agregá personal antes de compartir."); return; }
+    if (currentView === "slots") { exportSlotImage(); return; }
     const dates = getDayDates();
 
     const colEmpWidth = 150;
@@ -590,6 +696,62 @@
     canvas.toBlob(blob => {
       showPreview(blob);
     }, "image/png");
+  }
+
+  function exportSlotImage() {
+    const dates = getDayDates();
+    const labelW = 110, colW = 140, headerH = 60, chipH = 28, pad = 20;
+    const rowHeights = SLOTS.map(slot => {
+      let max = 1;
+      for (let d = 0; d < 7; d++) max = Math.max(max, peopleInSlot(slot, d).length);
+      return Math.max(44, max * chipH + 12);
+    });
+    const tableW = labelW + colW * 7;
+    const W = tableW + pad * 2;
+    const H = pad * 2 + 30 + headerH + rowHeights.reduce((a, b) => a + b, 0);
+    const canvas = document.createElement("canvas");
+    canvas.width = W * 2; canvas.height = H * 2;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(2, 2);
+    ctx.fillStyle = "#FFF9EE"; ctx.fillRect(0, 0, W, H);
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#5a4436"; ctx.font = "bold 20px Arial";
+    ctx.fillText("Horario semanal", pad, pad + 10);
+
+    let y = pad + 30;
+    ctx.fillStyle = "#F6A7C1"; ctx.fillRect(pad, y, tableW, headerH);
+    ctx.fillStyle = "#6b1f3d"; ctx.textAlign = "center";
+    for (let d = 0; d < 7; d++) {
+      const cx = pad + labelW + colW * d + colW / 2;
+      ctx.font = "bold 14px Arial"; ctx.fillText(DAYS[d], cx, y + headerH / 2 - 10);
+      ctx.font = "12px Arial"; ctx.fillText(formatDayDate(dates[d]), cx, y + headerH / 2 + 10);
+    }
+    y += headerH;
+
+    SLOTS.forEach((slot, i) => {
+      const rh = rowHeights[i];
+      ctx.fillStyle = slot.rest ? "#B16E4B" : "#FCF0CF";
+      ctx.fillRect(pad, y, labelW, rh);
+      ctx.strokeStyle = "#f0ddd0"; ctx.strokeRect(pad, y, labelW, rh);
+      ctx.fillStyle = slot.rest ? "#ffffff" : "#5a4436";
+      ctx.font = "bold 14px Arial";
+      ctx.fillText(slot.label, pad + labelW / 2, y + rh / 2);
+      for (let d = 0; d < 7; d++) {
+        const cx = pad + labelW + colW * d;
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(cx, y, colW, rh);
+        ctx.strokeRect(cx, y, colW, rh);
+        peopleInSlot(slot, d).forEach((p, idx) => {
+          const cy = y + 6 + idx * chipH;
+          ctx.fillStyle = slot.rest ? "#B16E4B" : p.color;
+          roundRect(ctx, cx + 6, cy, colW - 12, chipH - 5, 6); ctx.fill();
+          ctx.fillStyle = slot.rest ? "#ffffff" : "#5a4436";
+          ctx.font = "bold 13px Arial";
+          ctx.fillText(p.name, cx + colW / 2, cy + (chipH - 5) / 2 + 1);
+        });
+      }
+      y += rh;
+    });
+    canvas.toBlob(showPreview, "image/png");
   }
 
   function roundRect(ctx, x, y, w, h, r) {
