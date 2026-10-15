@@ -2,160 +2,19 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Horarios del Personal</title>
-<meta name="theme-color" content="#5c7fa3">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Horarios del personal</title>
+<meta name="theme-color" content="#f2f3f5">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-<header class="app-header">
-  <h1>🗓️ Horarios del Personal</h1>
-  <nav class="tabs">
-    <button class="tab-btn active" data-tab="horario">Horario</button>
-    <button class="tab-btn" data-tab="personal">Personal</button>
-    <button class="tab-btn" data-tab="roles">Roles</button>
-  </nav>
-</header>
-
-<main>
-
-  <!-- ===== VISTA: PERSONAL ===== -->
-  <section id="tab-personal" class="tab-content">
-    <h2>Personal</h2>
-    <p class="hint">Agregá acá a las personas una sola vez. Van a quedar guardadas para todas las semanas.</p>
-
-    <div class="add-employee-row">
-      <input type="text" id="new-employee-name" placeholder="Nombre de la persona" maxlength="20">
-      <button id="btn-add-employee" class="btn-primary">+ Agregar</button>
-    </div>
-
-    <ul id="employee-list" class="employee-list"></ul>
-  </section>
-
-  <!-- ===== VISTA: ROLES ===== -->
-  <section id="tab-roles" class="tab-content">
-    <h2>Roles</h2>
-    <p class="hint">Agregá los roles del personal (por ejemplo Cocina o Ayudante de bacha) para identificar cada turno.</p>
-
-    <div class="add-employee-row">
-      <input type="text" id="new-role-name" placeholder="Nombre del rol" maxlength="24">
-      <button id="btn-add-role" class="btn-primary">+ Agregar</button>
-    </div>
-
-    <ul id="role-list" class="role-list"></ul>
-
-    <div class="section-block">
-      <h3>Horarios predeterminados</h3>
-      <p class="hint">Estos horarios aparecen como acceso rápido al cargar un turno, sin importar el rol elegido.</p>
-      <div id="presets-manager" class="presets-manager"></div>
-      <div class="add-preset-row">
-        <div class="time-field"><label>Entrada</label><input type="time" id="new-preset-start" value="08:00"></div>
-        <div class="time-field"><label>Salida</label><input type="time" id="new-preset-end" value="16:00"></div>
-        <button id="btn-add-preset" class="btn-secondary">+ Horario</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== VISTA: HORARIO ===== -->
-  <section id="tab-horario" class="tab-content active">
-
-    <div class="week-picker-row">
-      <label for="week-start">Semana del (lunes):</label>
-      <input type="date" id="week-start">
-    </div>
-
-    <div id="empty-state" class="empty-state" hidden>
-      <p>Todavía no cargaste a nadie.</p>
-      <button class="btn-primary" id="btn-goto-personal">Ir a Personal</button>
-    </div>
-
-    <div class="view-toggle">
-      <button class="view-btn active" data-view="slots">Por horario</button>
-      <button class="view-btn" data-view="people">Por persona</button>
-    </div>
-
-    <div id="slot-wrapper" class="grid-wrapper">
-      <table id="slot-table" class="schedule-table slot-table"></table>
-    </div>
-
-    <div id="grid-wrapper" class="grid-wrapper" hidden>
-      <table id="schedule-table" class="schedule-table"></table>
-    </div>
-
-    <div class="actions-row">
-      <button id="btn-clear-week" class="btn-secondary">Vaciar semana</button>
-      <button id="btn-share" class="btn-primary btn-big">📤 Compartir horario</button>
-    </div>
-  </section>
-
-</main>
-
-<!-- ===== MODAL: EDITAR TURNOS DE UNA CELDA ===== -->
-<div id="modal-shift" class="modal-overlay" hidden>
-  <div class="modal-box">
-    <h3 id="modal-title">Turnos</h3>
-
-    <ul id="shift-list" class="shift-list"></ul>
-
-    <div class="new-shift-form">
-      <div class="field-block">
-        <label>Rol</label>
-        <select id="shift-role"></select>
-      </div>
-
-      <div id="preset-row" class="preset-row"></div>
-
-      <div class="time-row">
-        <div class="time-field">
-          <label>Entrada</label>
-          <input type="time" id="shift-start" value="08:00">
-        </div>
-        <div class="time-field">
-          <label>Salida</label>
-          <input type="time" id="shift-end" value="16:00">
-        </div>
-      </div>
-      <button id="btn-add-shift" class="btn-primary">+ Agregar turno</button>
-      <button id="btn-add-rest" class="btn-rest">🔴 Marcar descanso / libre</button>
-    </div>
-
-    <div class="modal-buttons">
-      <button id="btn-close-modal" class="btn-secondary">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== MODAL: ELEGIR PERSONAS PARA UN HORARIO ===== -->
-<div id="modal-slot" class="modal-overlay" hidden>
-  <div class="modal-box">
-    <h3 id="slot-title">Horario</h3>
-    <p class="hint">Tocá los nombres que trabajan en este horario.</p>
-    <div id="slot-people" class="slot-people"></div>
-    <div class="modal-buttons">
-      <button id="btn-close-slot" class="btn-primary">Listo</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== MODAL: PREVIEW DE IMAGEN ===== -->
-<div id="modal-preview" class="modal-overlay" hidden>
-  <div class="modal-box modal-box-wide">
-    <h3>Vista previa</h3>
-    <div class="preview-img-wrapper">
-      <img id="preview-image" alt="Horario">
-    </div>
-    <div class="modal-buttons">
-      <button id="btn-download-image" class="btn-secondary">⬇️ Descargar</button>
-      <button id="btn-share-native" class="btn-primary">📤 Compartir por WhatsApp</button>
-      <button id="btn-close-preview" class="btn-secondary">Cerrar</button>
-    </div>
-  </div>
-</div>
-
+<main id="app"></main>
 <script src="app.js"></script>
 </body>
 </html>
