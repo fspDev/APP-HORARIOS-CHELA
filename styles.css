@@ -188,6 +188,8 @@ svg { flex-shrink: 0; }
   padding: 9px 16px;
   white-space: nowrap;
 }
+.pills { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.pills .pill { margin-left: 0; }
 .pill.libre { background: var(--orange-soft); color: var(--orange); }
 .pill.empty { background: none; border: 2px dashed var(--blue); padding: 7px 14px; }
 .copy-row { margin-top: 12px; }

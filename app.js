@@ -67,6 +67,7 @@
     return `${hourText(a)} a ${hourText(b)}`;
   }
   function slotMinutes(key) {
+    if (key === LIBRE) return 99999;
     const [h, m] = key.split("-")[0].split(":").map(Number);
     return h * 60 + m;
   }
@@ -76,11 +77,17 @@
     const w = weeks[iso(ws)];
     return (w && w[day]) || {};
   }
-  function setAssignment(day, empId, value) {
+  // Cada persona puede tener varios horarios por día; "libre" va solo.
+  function valuesOf(data, empId) {
+    const v = data[empId];
+    if (!v) return [];
+    return (Array.isArray(v) ? v : [v]).slice().sort((a, b) => slotMinutes(a) - slotMinutes(b));
+  }
+  function setAssignment(day, empId, values) {
     const k = iso(weekStart);
     weeks[k] = weeks[k] || {};
     weeks[k][day] = weeks[k][day] || {};
-    if (value) weeks[k][day][empId] = value;
+    if (values.length) weeks[k][day][empId] = values;
     else delete weeks[k][day][empId];
     save(K_WEEKS, weeks);
   }
@@ -155,10 +162,10 @@
   function screenDay(day) {
     const data = dayData(weekStart, day);
     const rows = employees.map(e => {
-      const v = data[e.id];
-      const pill = !v ? '<span class="pill empty">+ Elegir</span>'
-        : v === LIBRE ? '<span class="pill libre">Libre</span>'
-        : `<span class="pill">${slotText(v)}</span>`;
+      const vals = valuesOf(data, e.id);
+      const pill = !vals.length ? '<span class="pill empty">+ Elegir</span>'
+        : vals[0] === LIBRE ? '<span class="pill libre">Libre</span>'
+        : `<span class="pills">${vals.map(v => `<span class="pill">${slotText(v)}</span>`).join("")}</span>`;
       return `<a class="row" href="#elegir-${day}-${e.id}">
         <span class="dot" style="background:${e.color}"></span>
         <span class="name">${esc(e.name)}</span>${pill}</a>`;
@@ -180,15 +187,20 @@
   function screenPick(day, empId) {
     const emp = empById(empId);
     if (!emp) return screenDay(day);
-    const current = dayData(weekStart, day)[empId];
+    const current = valuesOf(dayData(weekStart, day), empId);
+    const isLibre = current[0] === LIBRE;
     const keys = slots.slice();
-    if (current && current !== LIBRE && !keys.includes(current)) keys.push(current);
-    const buttons = keys.map(k => `<button class="slot-btn${current === k ? " on" : ""}" data-act="pick" data-v="${k}">${current === k ? ICON.check : ""}${slotText(k)}</button>`).join("");
+    current.forEach(v => { if (v !== LIBRE && !keys.includes(v)) keys.push(v); });
+    const buttons = keys.map(k => {
+      const on = current.includes(k);
+      return `<button class="slot-btn${on ? " on" : ""}" data-act="toggle" data-v="${k}">${on ? ICON.check : ""}${slotText(k)}</button>`;
+    }).join("");
     return `
-      <button class="btn-out btn-back" data-act="cancel" data-day="${day}">${ICON.x} Cancelar</button>
+      <button class="btn-out btn-back" data-act="cancel" data-day="${day}">${ICON.left} Volver al ${DAYS[day].toLowerCase()}</button>
       <h1 class="big"><span class="dot lg" style="background:${emp.color}"></span>${esc(emp.name)}</h1>
       <p class="sub">${DAYS[day]} ${fullDate(day)}</p>
       <h2 class="question">¿En qué horario trabaja?</h2>
+      <p class="hint" style="margin-top:-6px">Si trabaja en dos horarios, tocá los dos.</p>
       <div class="slot-grid">
         ${buttons}
         <button class="slot-btn other" data-act="other">Otro horario</button>
@@ -200,10 +212,11 @@
         </div>
         <button class="btn-main btn-blue" data-act="pick-other" style="margin-top:0">Guardar este horario</button>
       </div>
-      <button class="btn-libre${current === LIBRE ? " on" : ""}" data-act="pick" data-v="${LIBRE}">${current === LIBRE ? ICON.check : ""}Libre · no trabaja</button>
-      ${current ? '<button class="link-clear" data-act="pick" data-v="">Dejar sin cargar</button>' : ""}
+      <button class="btn-libre${isLibre ? " on" : ""}" data-act="libre">${isLibre ? ICON.check : ""}Libre · no trabaja</button>
+      ${current.length ? '<button class="link-clear" data-act="clear">Dejar sin cargar</button>' : ""}
       <div class="spacer"></div>
-      <p class="foot">${ICON.info} Al tocar un horario, queda guardado.</p>`;
+      <p class="foot">${ICON.info} Al tocar un horario, queda guardado.</p>
+      <button class="btn-main btn-blue" data-act="cancel" data-day="${day}">${ICON.check} Listo</button>`;
   }
 
   // Agrupa por día: [{day, lines:[{key, names}]}]
@@ -213,8 +226,7 @@
       const data = dayData(weekStart, d);
       const groups = {};
       employees.forEach(e => {
-        const v = data[e.id];
-        if (v) (groups[v] = groups[v] || []).push(e.name);
+        valuesOf(data, e.id).forEach(v => (groups[v] = groups[v] || []).push(e.name));
       });
       const keys = Object.keys(groups).filter(k => k !== LIBRE).sort((a, b) => slotMinutes(a) - slotMinutes(b));
       if (groups[LIBRE]) keys.push(LIBRE);
@@ -298,8 +310,10 @@
     else if (h === "personas") app.innerHTML = screenPeople();
     else if (h === "horarios") app.innerHTML = screenSlots();
     else app.innerHTML = screenWeek();
-    window.scrollTo(0, 0);
+    if (h !== lastHash) window.scrollTo(0, 0);
+    lastHash = h;
   }
+  let lastHash = null;
   window.addEventListener("hashchange", render);
 
   function go(hash) { location.replace(hash || "#"); }
@@ -317,9 +331,20 @@
     if (act === "prev") { setWeek(addDays(weekStart, -7)); render(); }
     else if (act === "next") { setWeek(addDays(weekStart, 7)); render(); }
     else if (act === "cancel") { go("#dia-" + el.dataset.day); }
-    else if (act === "pick" && m) {
-      setAssignment(+m[1], m[2], el.dataset.v);
+    else if (act === "toggle" && m) {
+      const day = +m[1], v = el.dataset.v;
+      let vals = valuesOf(dayData(weekStart, day), m[2]).filter(x => x !== LIBRE);
+      vals = vals.includes(v) ? vals.filter(x => x !== v) : vals.concat(v);
+      setAssignment(day, m[2], vals);
+      render();
+    }
+    else if (act === "libre" && m) {
+      setAssignment(+m[1], m[2], [LIBRE]);
       go("#dia-" + m[1]);
+    }
+    else if (act === "clear" && m) {
+      setAssignment(+m[1], m[2], []);
+      render();
     }
     else if (act === "other") {
       const box = document.getElementById("other-box");
@@ -330,15 +355,17 @@
       const a = document.getElementById("other-start").value;
       const b = document.getElementById("other-end").value;
       if (!a || !b) return;
-      setAssignment(+m[1], m[2], `${a}-${b}`);
-      go("#dia-" + m[1]);
+      const day = +m[1], key = `${a}-${b}`;
+      const vals = valuesOf(dayData(weekStart, day), m[2]).filter(x => x !== LIBRE && x !== key);
+      setAssignment(day, m[2], vals.concat(key));
+      render();
     }
     else if (act === "copy") {
       const day = +el.dataset.day;
       const prev = dayData(addDays(weekStart, -7), day);
       const ids = employees.map(x => x.id).filter(id => prev[id]);
       if (!ids.length) { alert(`No hay nada cargado el ${DAYS[day].toLowerCase()} pasado.`); return; }
-      ids.forEach(id => setAssignment(day, id, prev[id]));
+      ids.forEach(id => setAssignment(day, id, valuesOf(prev, id)));
       render();
     }
     else if (act === "share") shareImage(false);
