@@ -156,7 +156,7 @@
       </div>
       <p class="hint">Tocá un día para cargar quién trabaja.</p>
       ${days}
-      ${employees.length ? `<a class="btn-outline-blue" href="#tabla" style="margin-top:12px">${ICON.table} Ver como tabla</a>` : ""}
+      ${employees.length ? `<a class="btn-outline-blue" href="#" style="margin-top:12px">${ICON.table} Ver como tabla</a>` : ""}
       <div class="spacer"></div>
       ${employees.length ? `<a class="btn-main btn-green" href="#enviar">${ICON.send} Enviar por WhatsApp</a>` : ""}`;
   }
@@ -174,9 +174,9 @@
     }).join("");
     const next = day < 6
       ? `<a class="btn-main btn-blue" href="#dia-${day + 1}" data-replace>Listo, pasar al ${DAYS[day + 1].toLowerCase()} ${ICON.arrow}</a>`
-      : `<a class="btn-main btn-blue" href="#">Listo, volver a la semana</a>`;
+      : `<a class="btn-main btn-blue" href="#dias" data-replace>Listo, volver a la semana</a>`;
     return `
-      <a class="btn-out btn-back" href="#">${ICON.left} Volver a la semana</a>
+      <a class="btn-out btn-back" href="#dias">${ICON.left} Volver a los días</a>
       <h1 class="big">${DAYS[day]}</h1>
       <p class="sub">${fullDate(day)}</p>
       <div class="info">Tocá un nombre para elegir su horario.</div>
@@ -331,12 +331,20 @@
       return `<tr><th class="${key === LIBRE ? "rlibre" : ""}">${rowLabel(key)}</th>${cells}</tr>`;
     }).join("");
     return `
-      <a class="btn-out btn-back" href="#">${ICON.left} Volver a la semana</a>
-      <h1 class="big">Tabla de la semana</h1>
-      <p class="sub">${weekLabel(weekStart)} · tocá un casillero para cargar nombres.</p>
+      <header class="top">
+        <h1>Horarios del personal</h1>
+        <a class="btn-out" href="#personas">${ICON.person} Personas</a>
+      </header>
+      <div class="week-card">
+        <button class="nav-btn" data-act="prev" aria-label="Semana anterior">${ICON.left}</button>
+        <div class="label"><small>Semana del</small><strong>${weekLabel(weekStart)}</strong></div>
+        <button class="nav-btn" data-act="next" aria-label="Semana siguiente">${ICON.right}</button>
+      </div>
+      <p class="hint">Tocá un casillero para cargar nombres.</p>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div>
+      <a class="btn-outline-blue" href="#dias" style="margin-top:12px">Cargar día por día</a>
       <div class="spacer"></div>
-      <button class="btn-main btn-green" data-act="share-table">${ICON.send} Mandar tabla por WhatsApp</button>
+      <button class="btn-main btn-green" data-act="share-table">${ICON.send} Mandar por WhatsApp</button>
       <button class="btn-plain" data-act="download-table">${ICON.download} Guardar en el teléfono</button>`;
   }
 
@@ -349,13 +357,13 @@
         <span class="tick">${on ? ICON.check : ""}</span></button>`;
     }).join("");
     return `
-      <a class="btn-out btn-back" href="#tabla" data-replace>${ICON.left} Volver a la tabla</a>
+      <a class="btn-out btn-back" href="#" data-replace>${ICON.left} Volver a la tabla</a>
       <h1 class="big">${DAYS[day]} ${dateOf(day).getDate()}</h1>
       <p class="sub">${key === LIBRE ? "Descanso (no trabajan)" : `Horario ${slotText(key)}`}</p>
       <div class="info">Tocá quiénes ${key === LIBRE ? "tienen descanso" : "trabajan en este horario"}.</div>
       <div class="list">${rows}</div>
       <div class="spacer"></div>
-      <a class="btn-main btn-blue" href="#tabla" data-replace>${ICON.check} Listo</a>`;
+      <a class="btn-main btn-blue" href="#" data-replace>${ICON.check} Listo</a>`;
   }
 
   // ---------- Router ----------
@@ -365,11 +373,11 @@
     if ((m = h.match(/^dia-(\d)$/))) app.innerHTML = screenDay(+m[1]);
     else if ((m = h.match(/^elegir-(\d)-(.+)$/))) app.innerHTML = screenPick(+m[1], m[2]);
     else if ((m = h.match(/^celda-(\d)-(.+)$/))) app.innerHTML = screenCell(+m[1], decodeURIComponent(m[2]));
-    else if (h === "tabla") app.innerHTML = screenTable();
+    else if (h === "dias") app.innerHTML = screenWeek();
     else if (h === "enviar") app.innerHTML = screenSend();
     else if (h === "personas") app.innerHTML = screenPeople();
     else if (h === "horarios") app.innerHTML = screenSlots();
-    else app.innerHTML = screenWeek();
+    else app.innerHTML = employees.length ? screenTable() : screenWeek();
     if (h !== lastHash) window.scrollTo(0, 0);
     lastHash = h;
   }
