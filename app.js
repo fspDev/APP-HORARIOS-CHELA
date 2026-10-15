@@ -119,6 +119,7 @@
     send: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>',
     copy: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
     download: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+    table: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>',
     info: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 16.5v.5"/></svg>',
     warn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 21h20L12 3z"/><path d="M12 10v5M12 18v.5"/></svg>'
   };
@@ -155,6 +156,7 @@
       </div>
       <p class="hint">Tocá un día para cargar quién trabaja.</p>
       ${days}
+      ${employees.length ? `<a class="btn-outline-blue" href="#tabla" style="margin-top:12px">${ICON.table} Ver como tabla</a>` : ""}
       <div class="spacer"></div>
       ${employees.length ? `<a class="btn-main btn-green" href="#enviar">${ICON.send} Enviar por WhatsApp</a>` : ""}`;
   }
@@ -300,12 +302,70 @@
       </form>`;
   }
 
+  // ---------- Tabla: filas = horarios, columnas = días ----------
+  function tableRows() {
+    const keys = slots.slice();
+    for (let d = 0; d < 7; d++) {
+      const data = dayData(weekStart, d);
+      employees.forEach(e => valuesOf(data, e.id).forEach(v => { if (v !== LIBRE && !keys.includes(v)) keys.push(v); }));
+    }
+    keys.sort((a, b) => slotMinutes(a) - slotMinutes(b));
+    return [LIBRE].concat(keys);
+  }
+  function namesIn(key, day) {
+    const data = dayData(weekStart, day);
+    return employees.filter(e => valuesOf(data, e.id).includes(key));
+  }
+  const rowLabel = key => key === LIBRE ? "Descanso" : slotText(key);
+
+  function screenTable() {
+    const head = DAYS.map((n, i) => `<th${isToday(i) ? ' class="today"' : ""}>${n.slice(0, 3).toUpperCase()}<small>${dateOf(i).getDate()}</small></th>`).join("");
+    const body = tableRows().map(key => {
+      const cells = DAYS.map((_, d) => {
+        const people = namesIn(key, d);
+        const inner = people.length
+          ? people.map(p => `<span class="tchip${key === LIBRE ? " libre" : ""}" style="${key === LIBRE ? "" : `background:${p.color}`}">${esc(p.name)}</span>`).join("")
+          : '<span class="tplus">+</span>';
+        return `<td><a href="#celda-${d}-${encodeURIComponent(key)}">${inner}</a></td>`;
+      }).join("");
+      return `<tr><th class="${key === LIBRE ? "rlibre" : ""}">${rowLabel(key)}</th>${cells}</tr>`;
+    }).join("");
+    return `
+      <a class="btn-out btn-back" href="#">${ICON.left} Volver a la semana</a>
+      <h1 class="big">Tabla de la semana</h1>
+      <p class="sub">${weekLabel(weekStart)} · tocá un casillero para cargar nombres.</p>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div>
+      <div class="spacer"></div>
+      <button class="btn-main btn-green" data-act="share-table">${ICON.send} Mandar tabla por WhatsApp</button>
+      <button class="btn-plain" data-act="download-table">${ICON.download} Guardar en el teléfono</button>`;
+  }
+
+  function screenCell(day, key) {
+    const rows = employees.map(e => {
+      const on = valuesOf(dayData(weekStart, day), e.id).includes(key);
+      return `<button class="row pick-person${on ? " on" : ""}" data-act="cell-toggle" data-id="${e.id}">
+        <span class="dot" style="background:${e.color}"></span>
+        <span class="name">${esc(e.name)}</span>
+        <span class="tick">${on ? ICON.check : ""}</span></button>`;
+    }).join("");
+    return `
+      <a class="btn-out btn-back" href="#tabla" data-replace>${ICON.left} Volver a la tabla</a>
+      <h1 class="big">${DAYS[day]} ${dateOf(day).getDate()}</h1>
+      <p class="sub">${key === LIBRE ? "Descanso (no trabajan)" : `Horario ${slotText(key)}`}</p>
+      <div class="info">Tocá quiénes ${key === LIBRE ? "tienen descanso" : "trabajan en este horario"}.</div>
+      <div class="list">${rows}</div>
+      <div class="spacer"></div>
+      <a class="btn-main btn-blue" href="#tabla" data-replace>${ICON.check} Listo</a>`;
+  }
+
   // ---------- Router ----------
   function render() {
     const h = location.hash.replace("#", "");
     let m;
     if ((m = h.match(/^dia-(\d)$/))) app.innerHTML = screenDay(+m[1]);
     else if ((m = h.match(/^elegir-(\d)-(.+)$/))) app.innerHTML = screenPick(+m[1], m[2]);
+    else if ((m = h.match(/^celda-(\d)-(.+)$/))) app.innerHTML = screenCell(+m[1], decodeURIComponent(m[2]));
+    else if (h === "tabla") app.innerHTML = screenTable();
     else if (h === "enviar") app.innerHTML = screenSend();
     else if (h === "personas") app.innerHTML = screenPeople();
     else if (h === "horarios") app.innerHTML = screenSlots();
@@ -368,8 +428,21 @@
       ids.forEach(id => setAssignment(day, id, valuesOf(prev, id)));
       render();
     }
+    else if (act === "cell-toggle") {
+      const c = location.hash.match(/^#celda-(\d)-(.+)$/);
+      if (!c) return;
+      const day = +c[1], key = decodeURIComponent(c[2]), id = el.dataset.id;
+      let vals = valuesOf(dayData(weekStart, day), id);
+      if (vals.includes(key)) vals = vals.filter(v => v !== key);
+      else if (key === LIBRE) vals = [LIBRE];
+      else vals = vals.filter(v => v !== LIBRE).concat(key);
+      setAssignment(day, id, vals);
+      render();
+    }
     else if (act === "share") shareImage(false);
     else if (act === "download") shareImage(true);
+    else if (act === "share-table") shareImage(false, buildTableImage);
+    else if (act === "download-table") shareImage(true, buildTableImage);
     else if (act === "remove-emp") {
       const emp = empById(el.dataset.id);
       if (!emp || !confirm(`¿Quitar a ${emp.name}?`)) return;
@@ -455,9 +528,76 @@
     return new Promise(resolve => canvas.toBlob(resolve, "image/png"));
   }
 
-  async function shareImage(onlySave) {
+  function buildTableImage() {
+    const rows = tableRows();
+    const FONT = '"Atkinson Hyperlegible", Arial, sans-serif';
+    const P = 24, labelW = 110, colW = 130, headH = 56, chipH = 30;
+    const rowH = rows.map(k => {
+      let max = 1;
+      for (let d = 0; d < 7; d++) max = Math.max(max, namesIn(k, d).length);
+      return Math.max(46, max * chipH + 12);
+    });
+    const tableW = labelW + colW * 7;
+    const W = tableW + P * 2;
+    const H = P + 44 + headH + rowH.reduce((a, b) => a + b, 0) + P;
+    const canvas = document.createElement("canvas");
+    canvas.width = W * 2; canvas.height = H * 2;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(2, 2);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#1b1d21"; ctx.font = `bold 26px ${FONT}`;
+    ctx.fillText(`Horario · ${weekLabel(weekStart)}`, P, P + 14);
+
+    let y = P + 44;
+    ctx.fillStyle = "#1f4fa8"; ctx.fillRect(P, y, tableW, headH);
+    ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
+    for (let d = 0; d < 7; d++) {
+      const cx = P + labelW + colW * d + colW / 2;
+      ctx.font = `bold 16px ${FONT}`; ctx.fillText(DAYS[d].toUpperCase(), cx, y + 20);
+      ctx.font = `14px ${FONT}`; ctx.fillText(String(dateOf(d).getDate()), cx, y + 40);
+    }
+    y += headH;
+    ctx.strokeStyle = "#dfe2e6"; ctx.lineWidth = 1;
+    rows.forEach((key, i) => {
+      const rh = rowH[i], libre = key === LIBRE;
+      ctx.fillStyle = libre ? "#fae5d9" : "#f2f3f5";
+      ctx.fillRect(P, y, labelW, rh);
+      ctx.strokeRect(P, y, labelW, rh);
+      ctx.fillStyle = libre ? "#8a3a10" : "#1b1d21";
+      ctx.font = `bold 17px ${FONT}`;
+      ctx.fillText(rowLabel(key), P + labelW / 2, y + rh / 2);
+      for (let d = 0; d < 7; d++) {
+        const cx = P + labelW + colW * d;
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(cx, y, colW, rh);
+        ctx.strokeRect(cx, y, colW, rh);
+        namesIn(key, d).forEach((p, idx) => {
+          const cy = y + 6 + idx * chipH;
+          ctx.fillStyle = libre ? "#fae5d9" : p.color;
+          roundRect(ctx, cx + 6, cy, colW - 12, chipH - 5, 7); ctx.fill();
+          ctx.fillStyle = libre ? "#8a3a10" : "#1b1d21";
+          ctx.font = `bold 15px ${FONT}`;
+          ctx.fillText(p.name, cx + colW / 2, cy + (chipH - 5) / 2 + 1, colW - 20);
+        });
+      }
+      y += rh;
+    });
+    return new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  async function shareImage(onlySave, builder) {
     try { await document.fonts.ready; } catch (e) {}
-    const blob = await buildImage();
+    const blob = await (builder || buildImage)();
     const name = `horario_${iso(weekStart)}.png`;
     const file = new File([blob], name, { type: "image/png" });
     if (!onlySave && navigator.canShare && navigator.canShare({ files: [file] })) {

@@ -283,6 +283,58 @@ svg { flex-shrink: 0; }
   margin-top: 12px;
 }
 
+/* ---------- Tabla ---------- */
+.tbl-wrap {
+  overflow-x: auto;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+}
+.tbl { border-collapse: collapse; font-size: 0.95rem; }
+.tbl th, .tbl td { border: 1px solid var(--line); text-align: center; }
+.tbl thead th {
+  background: var(--blue);
+  color: white;
+  padding: 8px 6px;
+  font-size: 0.85rem;
+  min-width: 92px;
+}
+.tbl thead th.today { background: #163b80; }
+.tbl thead th small { display: block; font-weight: 400; }
+.tbl thead th:first-child { background: var(--blue); min-width: 0; }
+.tbl tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg);
+  padding: 8px 10px;
+  white-space: nowrap;
+  font-size: 1rem;
+}
+.tbl tbody th.rlibre { background: var(--orange-soft); color: var(--orange); }
+.tbl thead th:first-child { position: sticky; left: 0; z-index: 2; }
+.tbl td a {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 48px;
+  padding: 5px;
+  justify-content: center;
+}
+.tchip {
+  border-radius: 8px;
+  padding: 5px 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.tchip.libre { background: var(--orange-soft); color: var(--orange); }
+.tplus { color: #b4bac2; font-size: 1.3rem; }
+
+.pick-person { width: 100%; text-align: left; }
+.pick-person.on { border-color: var(--blue); background: var(--blue-soft); }
+.pick-person .tick { margin-left: auto; color: var(--blue); }
+
 /* ---------- Personas ---------- */
 .btn-quitar {
   margin-left: auto;
