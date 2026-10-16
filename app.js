@@ -4,6 +4,8 @@
   const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
   const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   const COLORS = ["#F6A7C1", "#FFD27A", "#E3C0AE", "#F2DFA0", "#E9B4C8", "#F5B94A", "#F3D1DC", "#D9A98C"];
+  const PALETTE = ["#F6A7C1", "#F3D1DC", "#E9B4C8", "#FFD27A", "#F2DFA0", "#F5B94A", "#E3C0AE", "#F4B58F", "#B9DDB0", "#A8D8CF", "#A9CDEB", "#C9B8E8"];
+  let colorOpen = null;
   const DEFAULT_SLOTS = ["08:00-16:00", "11:00-15:00", "12:00-16:00", "15:00-19:00", "16:00-00:00", "19:00-00:00", "20:00-00:00"];
   const LIBRE = "libre";
 
@@ -258,16 +260,23 @@
 
   function screenPeople() {
     const rows = employees.map(e => `
-      <div class="row">
-        <span class="dot" style="background:${e.color}"></span>
-        <span class="name">${esc(e.name)}</span>
-        <button class="btn-quitar" data-act="remove-emp" data-id="${e.id}">Quitar</button>
+      <div class="person-card">
+        <div class="row">
+          <button class="dot-btn" data-act="color-open" data-id="${e.id}" aria-label="Cambiar color de ${esc(e.name)}">
+            <span class="dot lg" style="background:${e.color}"></span>
+          </button>
+          <span class="name">${esc(e.name)}</span>
+          <button class="btn-quitar" data-act="remove-emp" data-id="${e.id}">Quitar</button>
+        </div>
+        ${colorOpen === e.id ? `<div class="palette"><p>Elegí un color para ${esc(e.name)}:</p><div class="swatches">${PALETTE.map(c =>
+          `<button class="swatch${c === e.color ? " on" : ""}" style="background:${c}" data-act="color-set" data-id="${e.id}" data-c="${c}" aria-label="Color">${c === e.color ? ICON.check : ""}</button>`).join("")}</div></div>` : ""}
       </div>`).join("");
     const preview = slots.slice(0, 3).map(slotText).join(", ") + (slots.length > 3 ? ` y ${slots.length - 3} más` : "");
     return `
       <a class="btn-out btn-back" href="#">${ICON.left} Volver a la semana</a>
       <h1 class="big">Personas</h1>
-      <div class="list" style="margin-top:12px">${rows}</div>
+      <p class="hint-color">Tocá el color de una persona para cambiarlo.</p>
+      <div class="list">${rows}</div>
       <form class="add-card" data-form="emp">
         <b>Agregar una persona</b>
         <div class="add-line">
@@ -378,7 +387,7 @@
     else if (h === "personas") app.innerHTML = screenPeople();
     else if (h === "horarios") app.innerHTML = screenSlots();
     else app.innerHTML = employees.length ? screenTable() : screenWeek();
-    if (h !== lastHash) window.scrollTo(0, 0);
+    if (h !== lastHash) { window.scrollTo(0, 0); colorOpen = null; }
     lastHash = h;
   }
   let lastHash = null;
@@ -451,6 +460,18 @@
     else if (act === "download") shareImage(true);
     else if (act === "share-table") shareImage(false, buildTableImage);
     else if (act === "download-table") shareImage(true, buildTableImage);
+    else if (act === "color-open") {
+      colorOpen = colorOpen === el.dataset.id ? null : el.dataset.id;
+      render();
+    }
+    else if (act === "color-set") {
+      const emp = empById(el.dataset.id);
+      if (!emp) return;
+      emp.color = el.dataset.c;
+      save(K_EMP, employees);
+      colorOpen = null;
+      render();
+    }
     else if (act === "remove-emp") {
       const emp = empById(el.dataset.id);
       if (!emp || !confirm(`¿Quitar a ${emp.name}?`)) return;
